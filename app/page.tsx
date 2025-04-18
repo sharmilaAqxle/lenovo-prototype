@@ -1,47 +1,205 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import NewsModal from './components/NewsModal';
+import ConsumerConfidenceTab from './components/ConsumerConfidenceTab';
+import SearchInterestTab from './components/SearchInterestTab';
+import MarketShareTab from './components/MarketShareTab';
 
-// Organize questions by segments
+interface NewsItem {
+  heading: string;
+  shortInsight: string;
+  fullInsight: string;
+  imageUrl: string;
+}
+
+// Helper function to process GPT response into news format
+function processGPTResponse(response: string): NewsItem {
+  try {
+    // Expecting GPT to return JSON format
+    const parsed = JSON.parse(response);
+    return {
+      heading: parsed.heading || 'Latest Market Update',
+      shortInsight: parsed.shortInsight || 'Loading insight...',
+      fullInsight: parsed.fullInsight || 'Loading full insight...',
+      imageUrl: parsed.imageUrl || '/default-news.jpg'
+    };
+  } catch (e) {
+    console.error('Error parsing GPT response:', e);
+    // Fallback to treating the entire response as fullInsight
+    return {
+      heading: 'Market Update',
+      shortInsight: 'Latest market insights available',
+      fullInsight: response,
+      imageUrl: '/default-news.jpg'
+    };
+  }
+}
+
 const segments = {
   "Laptop Headlines": [
-    "news headlines on laptop sales, Lenovo, dell, HP",
-    "How are the current trade tensions affecting laptop prices",
-    "Latest announcements from major laptop manufacturers Lenovo, Dell, and HP"
+    {
+      question: "news headlines on laptop sales, Lenovo, dell, HP",
+      context: `You are a market analyst writing for a CMO. Analyze the latest news and provide response in this exact JSON format:
+      {
+        "heading": "Write a compelling news headline",
+        "shortInsight": "Write a 1-2 sentence key insight",
+        "fullInsight": "Write a detailed 3-4 paragraph analysis",
+        "imageUrl": "Suggest a descriptive image prompt for this news"
+      }`
+    },
+    {
+      question: "How are the current trade tensions affecting laptop prices",
+      context: `You are a market analyst writing for a CMO. Analyze the impact and provide response in this exact JSON format:
+      {
+        "heading": "Write a compelling news headline",
+        "shortInsight": "Write a 1-2 sentence key insight",
+        "fullInsight": "Write a detailed 3-4 paragraph analysis",
+        "imageUrl": "Suggest a descriptive image prompt for this news"
+      }`
+    },
+    {
+      question: "Latest announcements from major laptop manufacturers Lenovo, Dell, and HP",
+      context: `You are a market analyst writing for a CMO. Analyze the announcements and provide response in this exact JSON format:
+      {
+        "heading": "Write a compelling news headline",
+        "shortInsight": "Write a 1-2 sentence key insight",
+        "fullInsight": "Write a detailed 3-4 paragraph analysis",
+        "imageUrl": "Suggest a descriptive image prompt for this news"
+      }`
+    }
   ],
   "Consumer Confidence": [
-    "what is current state of consumer confidence",
-    "How does the current consumer confidence index compare to historical trends",
-    "what is current state of Us consumer"
+    {
+      question: "What's your experience with Lenovo, Dell, and HP customer support after warranty expiration? Analyze Reddit discussions from r/laptops, r/computers, r/sysadmin",
+      context: "Focus on post-warranty reliability and brand trust. Compare customer support experiences and satisfaction levels."
+    },
+    {
+      question: "How long did Lenovo, Dell, and HP laptops last before major hardware failures? Analyze Reddit discussions from r/laptops, r/techsupport, r/buildapc",
+      context: "Focus on durability concerns, common hardware issues, and longevity comparisons."
+    },
+    {
+      question: "Would users recommend Lenovo, Dell, or HP to friends? Analyze recommendations from Reddit's r/SuggestALaptop, r/GamingLaptops, r/sysadmin",
+      context: "Focus on brand loyalty, satisfaction levels, and reasons for recommendations."
+    },
+    {
+      question: "What specific Lenovo, Dell, and HP product lines do users trust most and avoid? Analyze Reddit discussions",
+      context: "Compare business vs. consumer models, identify most trusted product lines."
+    },
+    {
+      question: "How do Lenovo, Dell, and HP compare in repairability and upgradeability? Analyze Reddit discussions from r/framework, r/buildapc, r/techsupport",
+      context: "Focus on repair accessibility, part availability, and user-friendliness of repairs."
+    }
   ],
   "Search Interest": [
-    "What are the current search trends for laptops",
-    "Which laptop brands are getting the most online attention",
-    "Compare search interest between gaming laptops and business laptops"
+    {
+      question: "What are the current search trends for laptops across Google and YouTube? Include monthly search volumes (in thousands) and top related search terms for each brand.",
+      context: `Analyze search data and provide response in this exact JSON format:
+      {
+        "searchTrends": {
+          "months": string[],
+          "data": {
+            "Lenovo": {
+              "searchVolume": number[],
+              "topSearchTerms": [
+                {"term": string, "volume": number, "trend": "up" | "down" | "stable"}
+              ]
+            },
+            "Dell": {
+              "searchVolume": number[],
+              "topSearchTerms": [
+                {"term": string, "volume": number, "trend": "up" | "down" | "stable"}
+              ]
+            },
+            "HP": {
+              "searchVolume": number[],
+              "topSearchTerms": [
+                {"term": string, "volume": number, "trend": "up" | "down" | "stable"}
+              ]
+            }
+          },
+          "unit": "thousands",
+          "platform": "Google Search"
+        }
+      }`
+    },
+    {
+      question: "What are the most searched laptop-related topics and features in the last 6 months?",
+      context: `Analyze search trends and provide response in this exact JSON format:
+      {
+        "topCategories": [
+          {
+            "category": string,
+            "volume": number,
+            "trend": "up" | "down" | "stable",
+            "relatedTerms": string[]
+          }
+        ],
+        "featureInterest": {
+          "labels": string[],
+          "data": number[],
+          "trend": string[]
+        }
+      }`
+    },
+    {
+      question: "Compare search interest between gaming laptops and business laptops for major brands",
+      context: `Analyze segment search data and provide response in this exact JSON format:
+      {
+        "segmentComparison": {
+          "gaming": {
+            "brands": string[],
+            "searchVolume": number[],
+            "topModels": [
+              {"model": string, "volume": number}
+            ]
+          },
+          "business": {
+            "brands": string[],
+            "searchVolume": number[],
+            "topModels": [
+              {"model": string, "volume": number}
+            ]
+          }
+        },
+        "insights": string[]
+      }`
+    }
   ],
   "Market Share": [
-    "what are SMB trends in laptop buying",
-    "Current market share distribution among major laptop manufacturers",
-    "Year-over-year changes in laptop market share"
+    {
+      question: "What is the current global market share distribution among laptop manufacturers? Focus on Lenovo, HP, Dell, Apple, Acer and others. Provide exact percentages and recent trends.",
+      context: "Analyze global laptop market share data and provide response in this exact JSON format: { 'globalShare': { 'Lenovo': number, 'HP': number, 'Dell': number, 'Apple': number, 'Acer': number, 'Others': number }, 'yearlyTrend': { 'quarters': string[], 'values': number[] }, 'insights': string[] }"
+    },
+    {
+      question: "What is Lenovo's market share across different segments (Consumer, Enterprise, Education, Gaming, Workstation)? Compare with industry average.",
+      context: "Analyze segment-wise market share and provide response in this exact JSON format: { 'segments': string[], 'lenovoShare': number[], 'competitorAvg': number[], 'insights': string[] }"
+    },
+    {
+      question: "What are the key growth drivers and strategic insights for Lenovo's market position? Include recommendations.",
+      context: "Analyze market position and provide response in this exact JSON format: { 'marketLeadership': string[], 'growthDrivers': string[], 'focusAreas': string[], 'recommendations': { 'shortTerm': string[], 'midTerm': string[], 'longTerm': string[] } }"
+    }
   ]
 };
 
 export default function Home() {
   const [activeSegment, setActiveSegment] = useState("Laptop Headlines");
-  const [answers, setAnswers] = useState<{[key: string]: string}>({});
+  const [answers, setAnswers] = useState<{[key: string]: any}>({});
   const [loading, setLoading] = useState<{[key: string]: boolean}>({});
   const [initialized, setInitialized] = useState(false);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
 
-  async function askQuestion(question: string) {
-    if (answers[question]) return; // Skip if already answered
+  async function askQuestion(question: string | { question: string; context: string }) {
+    const questionText = typeof question === 'string' ? question : question.question;
+    if (answers[questionText]) return;
     
-    setLoading(prev => ({ ...prev, [question]: true }));
+    setLoading(prev => ({ ...prev, [questionText]: true }));
     
     try {
       const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PERPLEXITY_API_KEY}`,
+          'Authorization': 'Bearer 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',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -49,11 +207,11 @@ export default function Home() {
           messages: [
             {
               role: "system",
-              content: "You are a helpful assistant that provides current and accurate information about market trends and business analysis."
+              content: typeof question === 'object' ? question.context : "You are a helpful assistant providing market analysis."
             },
             {
               role: "user",
-              content: question
+              content: questionText
             }
           ]
         })
@@ -65,37 +223,171 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setAnswers(prev => ({
-        ...prev,
-        [question]: data.choices[0].message.content
-      }));
+      const content = data.choices[0].message.content;
+      
+      if (activeSegment === "Laptop Headlines" && typeof question === 'object') {
+        const processedAnswer = processGPTResponse(content);
+        setAnswers(prev => ({
+          ...prev,
+          [questionText]: processedAnswer
+        }));
+      } else {
+        setAnswers(prev => ({
+          ...prev,
+          [questionText]: content
+        }));
+      }
     } catch (error) {
       console.error('Error:', error);
       setAnswers(prev => ({
         ...prev,
-        [question]: error instanceof Error ? error.message : 'Error fetching answer. Please try again.'
+        [questionText]: typeof question === 'object' && activeSegment === "Laptop Headlines"
+          ? {
+              heading: 'Error fetching data',
+              shortInsight: 'Unable to load market insights',
+              fullInsight: error instanceof Error ? error.message : 'Please try again later',
+              imageUrl: '/default-news.jpg'
+            }
+          : 'Error fetching answer. Please try again.'
       }));
     } finally {
-      setLoading(prev => ({ ...prev, [question]: false }));
+      setLoading(prev => ({ ...prev, [questionText]: false }));
     }
   }
 
-  // Load all questions for the initial segment on mount
   useEffect(() => {
     if (!initialized) {
       setInitialized(true);
+      if (activeSegment === "Laptop Headlines") {
+        segments[activeSegment].forEach(questionObj => {
+          askQuestion(questionObj);
+        });
+      } else {
+        segments[activeSegment].forEach(question => {
+          askQuestion(question);
+        });
+      }
+    }
+  }, [initialized]);
+
+  useEffect(() => {
+    if (activeSegment === "Laptop Headlines") {
+      segments[activeSegment].forEach(questionObj => {
+        askQuestion(questionObj);
+      });
+    } else {
       segments[activeSegment].forEach(question => {
         askQuestion(question);
       });
     }
-  }, [initialized]);
-
-  // Load questions for new segment when switched
-  useEffect(() => {
-    segments[activeSegment].forEach(question => {
-      askQuestion(question);
-    });
   }, [activeSegment]);
+
+  const renderLaptopHeadlines = () => {
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {segments["Laptop Headlines"].map((questionObj, index) => (
+            <div key={questionObj.question} 
+                 className="bg-white rounded-lg shadow-lg overflow-hidden">
+              {loading[questionObj.question] ? (
+                <div className="animate-pulse">
+                  <div className="h-48 bg-gray-200"></div>
+                  <div className="p-4">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                  </div>
+                </div>
+              ) : answers[questionObj.question] ? (
+                <div>
+                  <div className="relative h-48 bg-gray-100">
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-500 p-4 text-center">
+                      <span className="text-sm italic">Image prompt: {answers[questionObj.question].imageUrl}</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">
+                      {answers[questionObj.question].heading}
+                    </h3>
+                    <p className="text-gray-600 text-sm mb-4">
+                      {answers[questionObj.question].shortInsight}
+                    </p>
+                    <button 
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                      onClick={() => setSelectedNews(answers[questionObj.question])}
+                    >
+                      Read More →
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderOtherSegments = () => {
+    if (activeSegment === "Consumer Confidence") {
+      return (
+        <ConsumerConfidenceTab 
+          data={answers}
+          loading={Object.values(loading).some(Boolean)}
+        />
+      );
+    }
+
+    if (activeSegment === "Search Interest") {
+      return (
+        <SearchInterestTab
+          data={answers}
+          loading={Object.values(loading).some(Boolean)}
+        />
+      );
+    }
+
+    if (activeSegment === "Market Share") {
+      return (
+        <MarketShareTab
+          data={answers}
+          loading={Object.values(loading).some(Boolean)}
+        />
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+        {segments[activeSegment].map((question, index) => (
+          <div key={typeof question === 'string' ? question : question.question} 
+               className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {typeof question === 'string' ? question : question.question}
+              </h3>
+              
+              {loading[typeof question === 'string' ? question : question.question] ? (
+                <div className="flex items-center text-gray-500 space-x-2">
+                  <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+                  <span>Analyzing...</span>
+                </div>
+              ) : answers[typeof question === 'string' ? question : question.question] ? (
+                <div className="prose max-w-none text-gray-600">
+                  {typeof answers[typeof question === 'string' ? question : question.question] === 'string' 
+                    ? answers[typeof question === 'string' ? question : question.question]
+                    : 'Error displaying answer'}
+                </div>
+              ) : (
+                <div className="text-gray-500">
+                  Waiting to load...
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -131,37 +423,17 @@ export default function Home() {
 
         {/* Content Area */}
         <div className="mt-6 pb-12">
-          <div className="grid gap-6">
-            {segments[activeSegment].map((question, index) => (
-              <div
-                key={question}
-                className="bg-white shadow rounded-lg overflow-hidden"
-              >
-                <div className="p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    {question}
-                  </h3>
-                  
-                  {loading[question] ? (
-                    <div className="flex items-center text-gray-500 space-x-2">
-                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>
-                      <span>Analyzing...</span>
-                    </div>
-                  ) : answers[question] ? (
-                    <div className="prose max-w-none text-gray-600">
-                      {answers[question]}
-                    </div>
-                  ) : (
-                    <div className="text-gray-500">
-                      Waiting to load...
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          {activeSegment === "Laptop Headlines" ? renderLaptopHeadlines() : renderOtherSegments()}
         </div>
       </div>
+
+      {/* Modal */}
+      {selectedNews && (
+        <NewsModal 
+          news={selectedNews} 
+          onClose={() => setSelectedNews(null)} 
+        />
+      )}
     </div>
   );
 }
