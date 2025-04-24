@@ -8,8 +8,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Perplexity AI Market Analysis",
-  description: "Laptop Market & Consumer Trends Analysis using Perplexity AI",
+  title: {
+    default: "Mercurion",
+    template: "%s | Mercurion",
+  },
+  description: "Market Intelligence Dashboard using Aqxle AI",
 };
 
 export default function RootLayout({
