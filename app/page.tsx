@@ -5,6 +5,7 @@ import NewsModal from './components/NewsModal';
 import ConsumerConfidenceTab from './components/ConsumerConfidenceTab';
 import SearchInterestTab from './components/SearchInterestTab';
 import MarketShareTab from './components/MarketShareTab';
+import InteractableAgentTab from './components/InteractableAgentTab';
 
 interface NewsItem {
   heading: string;
@@ -37,6 +38,7 @@ function processGPTResponse(response: string): NewsItem {
 }
 
 const segments = {
+  "Interactable Agent": [],
   "Laptop Headlines": [
     {
       question: "news headlines on laptop sales, Lenovo, dell, HP",
@@ -183,7 +185,7 @@ const segments = {
 };
 
 export default function Home() {
-  const [activeSegment, setActiveSegment] = useState("Laptop Headlines");
+  const [activeSegment, setActiveSegment] = useState("Interactable Agent");
   const [answers, setAnswers] = useState<{[key: string]: any}>({});
   const [loading, setLoading] = useState<{[key: string]: boolean}>({});
   const [initialized, setInitialized] = useState(false);
@@ -199,7 +201,7 @@ export default function Home() {
       const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer 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',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PERPLEXITY_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -328,65 +330,21 @@ export default function Home() {
     );
   };
 
-  const renderOtherSegments = () => {
-    if (activeSegment === "Consumer Confidence") {
-      return (
-        <ConsumerConfidenceTab 
-          data={answers}
-          loading={Object.values(loading).some(Boolean)}
-        />
-      );
+  const renderContent = () => {
+    switch (activeSegment) {
+      case "Interactable Agent":
+        return <InteractableAgentTab />;
+      case "Laptop Headlines":
+        return renderLaptopHeadlines();
+      case "Consumer Confidence":
+        return <ConsumerConfidenceTab data={answers} loading={Object.values(loading).some(Boolean)} />;
+      case "Search Interest":
+        return <SearchInterestTab data={answers} loading={Object.values(loading).some(Boolean)} />;
+      case "Market Share":
+        return <MarketShareTab data={answers} loading={Object.values(loading).some(Boolean)} />;
+      default:
+        return null;
     }
-
-    if (activeSegment === "Search Interest") {
-      return (
-        <SearchInterestTab
-          data={answers}
-          loading={Object.values(loading).some(Boolean)}
-        />
-      );
-    }
-
-    if (activeSegment === "Market Share") {
-      return (
-        <MarketShareTab
-          data={answers}
-          loading={Object.values(loading).some(Boolean)}
-        />
-      );
-    }
-
-    return (
-      <div className="space-y-8">
-        {segments[activeSegment].map((question, index) => (
-          <div key={typeof question === 'string' ? question : question.question} 
-               className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {typeof question === 'string' ? question : question.question}
-              </h3>
-              
-              {loading[typeof question === 'string' ? question : question.question] ? (
-                <div className="flex items-center text-gray-500 space-x-2">
-                  <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>
-                  <span>Analyzing...</span>
-                </div>
-              ) : answers[typeof question === 'string' ? question : question.question] ? (
-                <div className="prose max-w-none text-gray-600">
-                  {typeof answers[typeof question === 'string' ? question : question.question] === 'string' 
-                    ? answers[typeof question === 'string' ? question : question.question]
-                    : 'Error displaying answer'}
-                </div>
-              ) : (
-                <div className="text-gray-500">
-                  Waiting to load...
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
   };
 
   return (
@@ -423,15 +381,15 @@ export default function Home() {
 
         {/* Content Area */}
         <div className="mt-6 pb-12">
-          {activeSegment === "Laptop Headlines" ? renderLaptopHeadlines() : renderOtherSegments()}
+          {renderContent()}
         </div>
       </div>
 
       {/* Modal */}
       {selectedNews && (
-        <NewsModal 
-          news={selectedNews} 
-          onClose={() => setSelectedNews(null)} 
+        <NewsModal
+          news={selectedNews}
+          onClose={() => setSelectedNews(null)}
         />
       )}
     </div>
